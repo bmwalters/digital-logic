@@ -1,0 +1,3 @@
+(executable
+ (name logic)
+ (libraries nottui))
