@@ -90,25 +90,42 @@ let render circuit : ui Lwd.t =
     Lwd.map render observed
   in
 
-  let render_component component =
+  let render_component ci component =
     match component with
-    | Nand -> Ui.hcat [ W.string "•\n•"; W.string "NAND"; W.string "•" ]
+    | Nand ->
+        Lwd.pure
+          (Ui.hcat [ W.string "•\n•"; W.string "NAND"; W.string "•" ])
     | Circuit c ->
         let dot_lines l =
           W.string (String.concat "\n" (List.map (fun _ -> "•") l))
         in
-        let input_dots = dot_lines c.inputs in
+        let input_dots =
+          Lwd.map Ui.vcat
+            (Lwd_utils.flatten_l
+               (List.mapi
+                  (fun ii _name ->
+                    let value = compute (ComponentIn (ci, ii)) in
+                    Lwd.map
+                      (fun v ->
+                        let color =
+                          if v then Notty.A.lightgreen else Notty.A.gray 5
+                        in
+                        W.string ~attr:(Notty.A.fg color) "•")
+                      value)
+                  c.inputs))
+        in
         let output_dots = dot_lines c.outputs in
-        Ui.hcat [ input_dots; W.string c.name; output_dots ]
+        Lwd.map
+          (fun idots -> Ui.hcat [ idots; W.string c.name; output_dots ])
+          input_dots
   in
 
   let render_component_area x_pos_abs y_pos_abs =
     Lwd.map Ui.zcat
       (Lwd_utils.flatten_l
-         (List.map
-            (fun it ->
-              render_component it |> Lwd.pure
-              |> drag_and_drop x_pos_abs y_pos_abs)
+         (List.mapi
+            (fun ci c ->
+              render_component ci c |> drag_and_drop x_pos_abs y_pos_abs)
             circuit.components))
   in
 
@@ -250,3 +267,11 @@ let adder =
   }
 
 let () = Ui_loop.run (render adder)
+
+(* let count = Lwd.var 0
+ *
+ * let button value =
+ *   let text = "Click me! " ^ string_of_int value in
+ *   W.button text (fun () -> Lwd.set count (value + 1))
+ *
+ * let () = Ui_loop.run (Lwd.map button (Lwd.get count)) *)
